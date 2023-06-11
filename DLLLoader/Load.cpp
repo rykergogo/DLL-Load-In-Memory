@@ -3,14 +3,14 @@
 #include "headers.h"
 /*
 
-~~~ This function is based off of: https://www.joachim-bauch.de/tutorials/loading-a-dll-from-memory/
+~~~ Loader function is based off of: https://www.joachim-bauch.de/tutorials/loading-a-dll-from-memory/
 
 */
 
-
 typedef BOOL(WINAPI* DllEntryProc)(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpReserved);
 
-int Loader(const char* payload, size_t payloadsize) {
+int Loader(char* payload, size_t payloadsize) {
+    
     // Parse PE Optional Header information
     DWORD Offset = *(DWORD*)(payload + 0x3c);
     WORD NumberOfSections = *(WORD*)(payload + Offset + 0x06);
@@ -36,7 +36,7 @@ int Loader(const char* payload, size_t payloadsize) {
         PointerToRawData = *(DWORD*)(payload + Offset + 0x14);
         // Reserve memory and do stuff
         dest = (unsigned char*)VirtualAlloc(memory + VirtualAddress, SizeOfRawData, MEM_COMMIT, PAGE_READWRITE);
-        memcpy(dest, payload + PointerToRawData, SizeOfRawData);
+        memmove(dest, payload + PointerToRawData, SizeOfRawData);
         Offset += 0x28;
     }
 
@@ -75,7 +75,7 @@ int Loader(const char* payload, size_t payloadsize) {
         nameRef = (unsigned long long*)(memory + importDesc->OriginalFirstThunk);
         symbolRef = (unsigned long long*)(memory + importDesc->FirstThunk);
         for (; *nameRef; nameRef++, symbolRef++) {
-            // TODO: Ordinal inputs
+            // Ordinal inputs
             if (*nameRef >> 60 == 0) {
                 thunkData = (PIMAGE_IMPORT_BY_NAME)(memory + *nameRef);
                 *symbolRef = (unsigned long long)GetProcAddress(module, (LPCSTR)&thunkData->Name);
@@ -105,7 +105,7 @@ int Loader(const char* payload, size_t payloadsize) {
         if ((Characteristics & 0x04) > 0) protect += PAGE_NOCACHE; // Non-cachable
         VirtualProtect(memory + VirtualAddress, SizeOfRawData, protect, &oldProtect);
 
-        if ((Characteristics & 0x02) > 0) VirtualFree(memory + VirtualAddress, SizeOfRawData, MEM_DECOMMIT); // Discardable
+        if ((Characteristics & 0x02) > 0) VirtualFree(memory + VirtualAddress, SizeOfRawData, MEM_DECOMMIT);
         Offset += 0x28;
     }
 
@@ -115,5 +115,7 @@ int Loader(const char* payload, size_t payloadsize) {
     std::cout << "Loader execution complete.\n";
     (*entry)((HINSTANCE)memory, DLL_PROCESS_DETACH, 0);
     std::cout << "DLL freeing complete.\n";
+
+
 	return 0;
 }
